@@ -13,11 +13,7 @@
 export default {
   data() {
     return {
-      mockedParagraphs: [
-        { id: 1, content: 'Lorem <span id="test">ipsum</span> dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Consectetur purus ut faucibus pulvinar. Habitasse platea dictumst vestibulum rhoncus est pellentesque elit ullamcorper. At risus viverra adipiscing at in tellus. Fusce ut placerat orci nulla pellentesque. Nibh nisl condimentum id venenatis. Vitae congue mauris rhoncus aenean vel elit. Nisi lacus sed viverra tellus in hac habitasse platea. Volutpat lacus laoreet non curabitur gravida arcu ac tortor dignissim. Eros in cursus turpis massa tincidunt dui ut ornare lectus.' },
-        { id: 2, content: 'Pellentesque massa placerat duis ultricies lacus sed turpis tincidunt id. Auctor neque vitae tempus quam pellentesque nec nam aliquam sem. Ac turpis egestas integer eget aliquet nibh praesent. Scelerisque purus semper eget duis at tellus at urna. Eleifend mi in nulla posuere sollicitudin aliquam ultrices. Congue eu consequat ac felis donec. Neque egestas congue quisque egestas diam in. Consectetur a erat nam at lectus urna. Sodales neque sodales ut etiam sit amet. Nullam non nisi est sit amet facilisis magna. Tellus id interdum velit laoreet id. Nulla at volutpat diam ut venenatis tellus in. Augue mauris augue neque gravida in fermentum. Porttitor rhoncus dolor purus non enim. Enim praesent elementum facilisis leo vel fringilla est ullamcorper. Nisl nisi scelerisque eu ultrices vitae. Tellus integer feugiat scelerisque varius morbi. Eleifend donec pretium vulputate sapien nec.' },
-        { id: 3, content: 'Ac turpis egestas sed tempus urna et pharetra. Nunc sed velit dignissim sodales ut eu. Volutpat odio facilisis mauris sit amet massa vitae tortor. Vestibulum mattis ullamcorper velit sed ullamcorper morbi. Enim neque volutpat ac tincidunt vitae semper quis lectus nulla. Nisi porta lorem mollis aliquam ut porttitor. Justo donec enim diam vulputate ut pharetra. Vestibulum lorem sed risus ultricies tristique. Dictum varius duis at consectetur lorem donec massa. Lacus suspendisse faucibus interdum posuere lorem ipsum dolor. Pellentesque habitant morbi tristique senectus et netus et. Sapien nec sagittis aliquam malesuada bibendum. Habitasse platea dictumst quisque sagittis. Diam sit amet nisl suscipit adipiscing bibendum est ultricies. Integer vitae justo eget magna fermentum iaculis eu non diam. Ultricies integer quis auctor elit sed vulputate. Aenean vel elit scelerisque mauris pellentesque. Elit at imperdiet dui accumsan sit amet.' }
-      ],
+      mockedParagraphs: [],
       showLinkMenu: false,
       lastSelectionText: null,
       lastSelectionElement: null,
@@ -25,7 +21,9 @@ export default {
       lastSelectionExtentOffset: null,
     };
   },
-  mounted() {
+  async mounted() {
+    await this.fetchData();
+    this.scrollToElementById();
     document.addEventListener('mouseup', event => {
       if (event.target.classList.contains('paragraph')) {
         this.showLinkMenu = true;
@@ -39,17 +37,67 @@ export default {
     });
   },
   methods: {
-    createLink() {
+    // I know that it's better to create some apiService and use it instead of sending requests from the component
+    // Just wanted to make working thing faster
+    // Of course the code should be improved/refactored
+    async createLink() {
       const selectedText = this.lastSelectionText;
-      const linkedText = `<span id="${(new Date()).getTime()}">${selectedText}</span>`;
+      const linkId = (new Date()).getTime();
+      // I'm creating id on a frontend, of course it can be done on a backend if needed
+      const linkedText = `<span id="${linkId}">${selectedText}</span>`;
       if (selectedText) {
         const selectedElement = this.lastSelectionElement;
+        const pId = this.lastSelectionElement.parentElement.dataset.id;
         let text = selectedElement.textContent;
         text = text.slice(0, this.lastSelectionBaseOffset) + linkedText + text.slice(this.lastSelectionExtentOffset);
-        selectedElement.parentElement.innerHTML = selectedElement.parentElement.innerHTML.replace(selectedElement.textContent, text);
-        alert('Link created');
+        // did just simple backend update for simplicity
+        // can be a different approach to handle it on frontend like this if backend request was success:
+        // selectedElement.parentElement.innerHTML = selectedElement.parentElement.innerHTML.replace(selectedElement.textContent, text);
+        await this.saveUpdatedParagraph(pId, text);
+        if (window.confirm('Link Created! If you click "ok" you would be redirected to test the new link'))
+        {
+          window.location.href=`/?id=${linkId}`;
+        };
       }
       this.showLinkMenu = false;
+    },
+    async fetchData () {
+      try {
+        const response = await fetch('/api/data')
+        const data = await response.json();
+        this.mockedParagraphs = data.mockedParagraphs;
+      } catch (err) {
+        console.log(err)
+      }
+
+    },
+    async saveUpdatedParagraph (id, content) {
+      try {
+        const response = await fetch('/api/updateParagraph', {
+          method: 'POST',
+          mode: 'cors',
+          cache: 'no-cache',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id, content })
+        });
+        const data = await response.json();
+        this.mockedParagraphs = data.mockedParagraphs;
+      } catch (err) {
+        console.log(err)
+      }
+
+    },
+    scrollToElementById() {
+      if (this.$route.query.id) {
+        const element = document.getElementById(this.$route.query.id);
+        if (element) {
+          // can be refactored by just using class
+          element.style.fontWeight = 'bold';
+          element.style.backgroundColor = 'yellow';
+          element.scrollIntoView();
+        }
+      }
     }
   }
 }
